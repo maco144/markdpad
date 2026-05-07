@@ -6,6 +6,7 @@ const store = new LazyStore("markdpad-state.json");
 const modeKey = (path: string) => `mode:${path}`;
 const THEME_KEY = "ui:theme";
 const SIDEBAR_KEY = "ui:sidebarOpen";
+const OUTLINE_KEY = "ui:outlineOpen";
 const RECENT_KEY = "ui:recentPaths";
 
 export async function loadFileMode(path: string): Promise<Mode | null> {
@@ -35,6 +36,15 @@ export async function saveSidebarOpen(open: boolean): Promise<void> {
   await store.set(SIDEBAR_KEY, open);
 }
 
+export async function loadOutlineOpen(): Promise<boolean> {
+  const v = await store.get<boolean>(OUTLINE_KEY);
+  return v ?? true;
+}
+
+export async function saveOutlineOpen(open: boolean): Promise<void> {
+  await store.set(OUTLINE_KEY, open);
+}
+
 export async function loadRecent(): Promise<string[]> {
   const v = await store.get<string[]>(RECENT_KEY);
   return Array.isArray(v) ? v : [];
@@ -44,4 +54,12 @@ export async function pushRecent(path: string): Promise<void> {
   const list = await loadRecent();
   const next = [path, ...list.filter((p) => p !== path)].slice(0, 20);
   await store.set(RECENT_KEY, next);
+}
+
+export async function removeRecent(path: string): Promise<void> {
+  const list = await loadRecent();
+  await store.set(
+    RECENT_KEY,
+    list.filter((p) => p !== path)
+  );
 }

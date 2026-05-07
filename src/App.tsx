@@ -8,8 +8,10 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Sidebar } from "./components/Sidebar";
 import { TabBar } from "./components/TabBar";
 import { Toolbar } from "./components/Toolbar";
-import { Editor } from "./components/Editor";
+import { Editor, type EditorSelection } from "./components/Editor";
 import { Preview } from "./components/Preview";
+import { StatusBar } from "./components/StatusBar";
+import { Outline } from "./components/Outline";
 
 import {
   loadFileMode,
@@ -18,9 +20,14 @@ import {
   saveTheme,
   loadSidebarOpen,
   saveSidebarOpen,
+  loadOutlineOpen,
+  saveOutlineOpen,
   pushRecent,
+  loadRecent,
+  removeRecent,
 } from "./store";
 import { setMermaidTheme } from "./markdown";
+import { exportHtml, exportPdf } from "./export";
 import type { Mode, OpenFile } from "./types";
 
 let idCounter = 0;
@@ -35,7 +42,12 @@ export default function App() {
   const [files, setFiles] = useState<OpenFile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [outlineOpen, setOutlineOpen] = useState(true);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [selection, setSelection] = useState<EditorSelection | null>(null);
+  const [recent, setRecent] = useState<string[]>([]);
+  const [scrollSlug, setScrollSlug] = useState<string | null>(null);
+  const [scrollLine, setScrollLine] = useState<number | null>(null);
 
   const filesRef = useRef(files);
   filesRef.current = files;
@@ -47,9 +59,16 @@ export default function App() {
   // Initial load: theme, sidebar, plus any files passed via CLI / file association.
   useEffect(() => {
     (async () => {
-      const [t, sb] = await Promise.all([loadTheme(), loadSidebarOpen()]);
+      const [t, sb, ol, r] = await Promise.all([
+        loadTheme(),
+        loadSidebarOpen(),
+        loadOutlineOpen(),
+        loadRecent(),
+      ]);
       setTheme(t);
       setSidebarOpen(sb);
+      setOutlineOpen(ol);
+      setRecent(r);
       setMermaidTheme(t);
       try {
         const pending = await invoke<string[]>("drain_pending_opens");
@@ -96,6 +115,10 @@ export default function App() {
     void saveSidebarOpen(sidebarOpen);
   }, [sidebarOpen]);
 
+  useEffect(() => {
+    void saveOutlineOpen(outlineOpen);
+  }, [outlineOpen]);
+
   const openPath = useCallback(async (path: string) => {
     // If already open, just focus it.
     const existing = filesRef.current.find((f) => f.path === path);
@@ -119,7 +142,7 @@ export default function App() {
     };
     setFiles((prev) => [...prev, file]);
     setActiveId(file.id);
-    void pushRecent(path);
+    void pushRecent(path).then(() => loadRecent().then(setRecent));
   }, []);
 
   const newFile = useCallback(() => {
@@ -172,7 +195,7 @@ export default function App() {
           : f
       )
     );
-    void pushRecent(path);
+    void pushRecent(path).then(() => loadRecent().then(setRecent));
     void saveFileMode(path, cur.mode);
   }, []);
 
@@ -282,6 +305,12 @@ export default function App() {
           onModeChange={(m) => active && setMode(active.id, m)}
           onSave={saveActive}
           onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+          onExportHtml={() =>
+            active && void exportHtml(active.content, theme, active.name).catch(() => {})
+          }
+          onExportPdf={() =>
+            active && void exportPdf(active.content, theme, active.name).catch(() => {})
+          }
         />
         <TabBar
           files={files}
@@ -302,22 +331,92 @@ export default function App() {
                   Open file… (Ctrl+O)
                 </button>
               </div>
+              {recent.length > 0 && (
+                <div className="recent-list">
+                  <h2>Recent</h2>
+                  <ul>
+                    {recent.slice(0, 10).map((p) => (
+                      <li key={p}>
+                        <button
+                          type="button"
+                          className="recent-item"
+                          onClick={() => void openPath(p)}
+                          title={p}
+                        >
+                          <span className="recent-name">{basename(p)}</span>
+                          <span className="recent-path">{p}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="recent-remove"
+                          aria-label={`Remove ${basename(p)} from recent`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void removeRecent(p).then(() => loadRecent().then(setRecent));
+                          }}
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <p className="hint">Drop a .md file anywhere in this window to open it.</p>
             </div>
           )}
           {active && active.mode === "edit" && (
-            <Editor
-              key={active.id}
-              value={active.content}
-              onChange={(v) => onContentChange(active.id, v)}
-              theme={theme}
-            />
+            <>
+              <Editor
+                key={active.id}
+                value={active.content}
+                onChange={(v) => onContentChange(active.id, v)}
+                onSelectionChange={setSelection}
+                theme={theme}
+                scrollToLine={scrollLine}
+              />
+              <button
+                type="button"
+                className="float-toggle"
+                onClick={() => setMode(active.id, "view")}
+                title="Switch to view mode (Ctrl+E)"
+              >
+                View
+              </button>
+            </>
           )}
           {active && active.mode === "view" && (
-            <Preview source={active.content} theme={theme} />
+            <>
+              <Preview source={active.content} theme={theme} scrollTo={scrollSlug} />
+              <button
+                type="button"
+                className="float-toggle"
+                onClick={() => setMode(active.id, "edit")}
+                title="Switch to edit mode (Ctrl+E)"
+              >
+                Edit
+              </button>
+            </>
           )}
         </div>
+        <StatusBar active={active} selection={active?.mode === "edit" ? selection : null} />
       </main>
+      <Outline
+        source={active?.content ?? ""}
+        open={outlineOpen}
+        onToggle={() => setOutlineOpen((v) => !v)}
+        onJump={(item) => {
+          if (!active) return;
+          if (active.mode === "view") {
+            // Re-set with a unique sentinel so Preview re-runs even on the same slug.
+            setScrollSlug(null);
+            setTimeout(() => setScrollSlug(item.slug), 0);
+          } else {
+            setScrollLine(null);
+            setTimeout(() => setScrollLine(item.line), 0);
+          }
+        }}
+      />
     </div>
   );
 }

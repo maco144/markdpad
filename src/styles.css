@@ -49,7 +49,7 @@ body {
 /* ===== Layout ===== */
 .app {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto 1fr auto;
   height: 100vh;
   overflow: hidden;
 }
@@ -64,8 +64,39 @@ body {
 .workspace {
   flex: 1;
   min-height: 0;
+  position: relative;
   overflow: hidden;
-  display: flex;
+}
+.workspace > .editor,
+.workspace > .preview,
+.workspace > .empty-state {
+  position: absolute;
+  inset: 0;
+}
+
+/* Floating in-pane mode toggle (top-right corner of editor or preview) */
+.float-toggle {
+  position: absolute;
+  top: 10px;
+  right: 18px;
+  z-index: 5;
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  opacity: 0.7;
+  transition: opacity 100ms ease, background 100ms ease;
+}
+.float-toggle:hover {
+  opacity: 1;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
 }
 
 /* ===== Sidebar ===== */
@@ -221,6 +252,35 @@ body {
 }
 .mode-btn-active:hover { background: var(--accent); }
 
+/* ===== Toolbar dropdown menu ===== */
+.menu-host { position: relative; }
+.menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  min-width: 140px;
+  z-index: 50;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.menu-item {
+  background: transparent;
+  border: none;
+  color: var(--fg);
+  font: inherit;
+  padding: 6px 12px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.menu-item:hover { background: var(--accent); color: var(--accent-fg); }
+
 /* ===== Tabs ===== */
 .tabbar {
   display: flex;
@@ -254,28 +314,31 @@ body {
 
 /* ===== Editor ===== */
 .editor {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
   display: flex;
+  overflow: hidden;
 }
 .editor > .cm-editor {
   flex: 1;
   height: 100%;
+  width: 100%;
   font-family: "Cascadia Code", "Consolas", "Menlo", monospace;
   font-size: 14px;
 }
-.cm-editor .cm-scroller { padding: 12px 0; }
+.cm-editor .cm-scroller {
+  padding: 12px 0;
+  overflow: auto;
+}
 .cm-editor .cm-content { padding: 0 16px; }
 
 /* ===== Preview ===== */
 .preview {
-  flex: 1;
   overflow-y: auto;
-  padding: 32px 48px;
+  overflow-x: hidden;
+}
+.preview-inner {
   max-width: 920px;
   margin: 0 auto;
-  width: 100%;
+  padding: 32px 48px;
   line-height: 1.65;
 }
 .preview h1, .preview h2, .preview h3, .preview h4, .preview h5, .preview h6 {
@@ -335,7 +398,6 @@ body {
 
 /* ===== Empty state ===== */
 .empty-state {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -365,6 +427,154 @@ body {
   color: var(--fg-subtle);
   margin-top: 16px;
 }
+.recent-list {
+  margin-top: 18px;
+  width: 100%;
+  max-width: 560px;
+}
+.recent-list h2 {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+.recent-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.recent-list li {
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.recent-list li:hover { background: var(--bg-elev-2); }
+.recent-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  background: transparent;
+  border: none;
+  padding: 6px 10px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--fg);
+  font: inherit;
+  min-width: 0;
+  overflow: hidden;
+}
+.recent-name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.recent-path {
+  font-size: 11px;
+  color: var(--fg-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  direction: rtl;
+  text-align: left;
+}
+.recent-remove {
+  background: transparent;
+  border: none;
+  color: var(--fg-subtle);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 8px;
+  opacity: 0;
+  transition: opacity 100ms;
+}
+.recent-list li:hover .recent-remove { opacity: 1; }
+.recent-remove:hover { color: var(--danger); }
+
+/* ===== Outline ===== */
+.outline {
+  background: var(--bg-elev);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: width 120ms ease;
+  overflow: hidden;
+}
+.outline-open { width: 240px; }
+.outline-collapsed { width: 36px; }
+
+.outline-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+  min-height: 36px;
+}
+.outline-title {
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.outline-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+  flex: 1;
+}
+.outline-item {
+  padding: 3px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-left: 2px solid transparent;
+}
+.outline-item:hover {
+  background: var(--bg-elev-2);
+  color: var(--fg);
+  border-left-color: var(--accent);
+}
+.outline-h1 { font-weight: 600; color: var(--fg); }
+.outline-h2 { font-weight: 500; color: var(--fg); }
+.outline-empty { padding: 10px; color: var(--fg-subtle); font-style: italic; }
+
+/* ===== Status bar ===== */
+.statusbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 12px;
+  background: var(--bg-elev);
+  border-top: 1px solid var(--border);
+  color: var(--fg-muted);
+  font-size: 12px;
+  height: 24px;
+  user-select: none;
+}
+.status-left, .status-right {
+  display: flex;
+  gap: 14px;
+}
+.status-item { white-space: nowrap; }
+.status-dirty { color: var(--accent); }
+.status-clean { opacity: 0.7; }
 
 /* ===== Scrollbars (Windows-friendly) ===== */
 ::-webkit-scrollbar { width: 10px; height: 10px; }

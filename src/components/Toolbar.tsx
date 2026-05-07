@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from "react";
 import type { Mode, OpenFile } from "../types";
 
 interface Props {
@@ -6,9 +7,30 @@ interface Props {
   onModeChange: (mode: Mode) => void;
   onSave: () => void;
   onToggleTheme: () => void;
+  onExportHtml: () => void;
+  onExportPdf: () => void;
 }
 
-export function Toolbar({ active, theme, onModeChange, onSave, onToggleTheme }: Props) {
+export function Toolbar({
+  active,
+  theme,
+  onModeChange,
+  onSave,
+  onToggleTheme,
+  onExportHtml,
+  onExportPdf,
+}: Props) {
+  const [exportOpen, setExportOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!exportOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setExportOpen(false);
+    };
+    window.addEventListener("mousedown", onClick);
+    return () => window.removeEventListener("mousedown", onClick);
+  }, [exportOpen]);
+
   const mode: Mode = active?.mode ?? "view";
   const dirty = active ? active.content !== active.savedContent : false;
   return (
@@ -54,6 +76,44 @@ export function Toolbar({ active, theme, onModeChange, onSave, onToggleTheme }: 
             >
               Save
             </button>
+            <div className="menu-host" ref={menuRef}>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setExportOpen((v) => !v)}
+                title="Export"
+                aria-haspopup="menu"
+                aria-expanded={exportOpen}
+              >
+                Export ▾
+              </button>
+              {exportOpen && (
+                <div className="menu" role="menu">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="menu-item"
+                    onClick={() => {
+                      setExportOpen(false);
+                      onExportHtml();
+                    }}
+                  >
+                    HTML…
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="menu-item"
+                    onClick={() => {
+                      setExportOpen(false);
+                      onExportPdf();
+                    }}
+                  >
+                    PDF…
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         )}
         <button
