@@ -48,6 +48,7 @@ export default function App() {
   const [recent, setRecent] = useState<string[]>([]);
   const [scrollSlug, setScrollSlug] = useState<string | null>(null);
   const [scrollLine, setScrollLine] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const filesRef = useRef(files);
   filesRef.current = files;
@@ -126,23 +127,30 @@ export default function App() {
       setActiveId(existing.id);
       return;
     }
-    const ok = await exists(path).catch(() => false);
-    if (!ok) return;
-    const content = await readTextFile(path);
-    const savedMode = await loadFileMode(path);
-    const mode: Mode = savedMode ?? "view"; // existing files default to view
-    const file: OpenFile = {
-      id: nextId(),
-      path,
-      name: basename(path),
-      content,
-      savedContent: content,
-      mode,
-      isNew: false,
-    };
-    setFiles((prev) => [...prev, file]);
-    setActiveId(file.id);
-    void pushRecent(path).then(() => loadRecent().then(setRecent));
+    try {
+      const ok = await exists(path);
+      if (!ok) {
+        setError(`File not found:\n${path}`);
+        return;
+      }
+      const content = await readTextFile(path);
+      const savedMode = await loadFileMode(path);
+      const mode: Mode = savedMode ?? "view"; // existing files default to view
+      const file: OpenFile = {
+        id: nextId(),
+        path,
+        name: basename(path),
+        content,
+        savedContent: content,
+        mode,
+        isNew: false,
+      };
+      setFiles((prev) => [...prev, file]);
+      setActiveId(file.id);
+      void pushRecent(path).then(() => loadRecent().then(setRecent));
+    } catch (err) {
+      setError(`Failed to open:\n${path}\n\n${err instanceof Error ? err.message : String(err)}`);
+    }
   }, []);
 
   const newFile = useCallback(() => {
@@ -288,6 +296,19 @@ export default function App() {
 
   return (
     <div className="app">
+      {error && (
+        <div className="error-toast" role="alert">
+          <pre>{error}</pre>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => setError(null)}
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
       <Sidebar
         files={files}
         activeId={activeId}
