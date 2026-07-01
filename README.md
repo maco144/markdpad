@@ -1,24 +1,33 @@
 # markdpad
 
-A fast, focused markdown viewer and editor for Windows. ~10MB MSIX, instant launch, GFM + math + mermaid + diagrams out of the box. No telemetry, no account.
+A fast, focused markdown viewer and editor for Windows. Built on Tauri 2 (Rust + native WebView2) — ~10 MB on disk, instant launch, no telemetry, no account required.
+
+## Download
+
+**[→ Download the latest installer](https://github.com/maco144/markdpad/releases/latest)**
+
+Grab the `.exe` (recommended) or `.msi` from the release assets, run it, and you're done. Requires Windows 10 or later (WebView2 is pre-installed on Windows 11; Windows 10 will prompt to install it automatically).
 
 ## Why
-Notepad can't render markdown. VS Code is overkill. Typora is $15. Most freemium markdown editors are sluggish Electron bundles. **markdpad** is built on Tauri 2 (Rust + native WebView2) so it launches in well under a second, weighs ~10 MB on disk, and feels like a native Windows app.
+
+Notepad can't render markdown. VS Code is overkill. Typora is $15. Most freemium markdown editors are sluggish Electron bundles. markdpad launches in well under a second and feels like a native Windows app.
 
 ## Features
-- **View / Edit toggle per file**, remembered. Existing files open in **view** mode by default; new files open in **edit** mode.
-- **Multi-tab**, plus a collapsible sidebar listing every open file.
-- **GitHub-flavored markdown**: tables, task lists, autolinks, anchors.
-- **Math** via KaTeX. **Mermaid** diagrams. **Syntax-highlighted** code blocks (Shiki).
-- **Drag-drop** any `.md` into the window to open it.
-- **Light + dark** themes.
-- **File association** for `.md`, `.markdown`, `.mdx`.
+
+- **View / Edit toggle per file**, remembered across sessions. Existing files open in view mode; new files open in edit mode.
+- **Multi-tab** with a collapsible sidebar listing every open file.
+- **GitHub-flavored markdown** — tables, task lists, autolinks, anchors.
+- **Math** via KaTeX. **Diagrams** via Mermaid. **Syntax highlighting** via Shiki.
+- **Drag and drop** any `.md` / `.markdown` / `.mdx` file into the window to open it.
+- **File associations** — double-click a `.md` file in Explorer to open it directly.
+- **Light and dark** themes.
 
 ## Keyboard shortcuts
+
 | Shortcut | Action |
 |---|---|
-| Ctrl+N | New file (opens in edit mode) |
-| Ctrl+O | Open file… |
+| Ctrl+N | New file |
+| Ctrl+O | Open file |
 | Ctrl+S | Save |
 | Ctrl+W | Close tab |
 | Ctrl+E | Toggle view / edit |
@@ -26,54 +35,40 @@ Notepad can't render markdown. VS Code is overkill. Typora is $15. Most freemium
 | Ctrl+Tab / Ctrl+Shift+Tab | Cycle tabs |
 | Ctrl+1…9 | Jump to tab N |
 
-## Development
+## Building from source
+
+Releases are built automatically via GitHub Actions on every version tag. To build locally you'll need a native Windows environment (not WSL) — Tauri targets WebView2 and the MSVC toolchain.
 
 ### Prerequisites
-- **Node 20+** and **pnpm**
-- **Rust** stable toolchain (`rustup`)
-- **Windows-side**: Microsoft Visual Studio C++ Build Tools and the WebView2 Runtime (preinstalled on Windows 11). See <https://v2.tauri.app/start/prerequisites/>.
 
-### WSL ↔ Windows split
-This repo lives in WSL. **`pnpm tauri dev` and `pnpm tauri build` must be run from native Windows** (PowerShell), because Tauri builds against WebView2 and the MSVC toolchain. Two options:
+- [Node.js 22+](https://nodejs.org) and [pnpm](https://pnpm.io)
+- [Rust stable](https://rustup.rs)
+- [Visual Studio C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (select "Desktop development with C++")
+- WebView2 Runtime — pre-installed on Windows 11; auto-prompted on Windows 10
 
-1. **Develop in WSL, build on Windows.** Edit code in WSL (VS Code Remote-WSL is great), then in PowerShell:
-   ```powershell
-   cd \\wsl$\Ubuntu\home\alex\markdpad
-   pnpm install
-   pnpm tauri dev
-   ```
-2. **Move the repo onto the Windows filesystem** for faster I/O:
-   ```powershell
-   git clone <remote> C:\src\markdpad
-   cd C:\src\markdpad
-   pnpm install
-   pnpm tauri dev
-   ```
+### Run in development
 
-### Frontend-only iteration
-You can iterate the React UI in WSL with no Tauri runtime — `invoke()` calls will throw, but the editor and renderer work fine in a normal browser:
-```bash
+```powershell
+git clone https://github.com/maco144/markdpad.git
+cd markdpad
 pnpm install
-pnpm dev   # http://localhost:1420
+pnpm tauri dev
 ```
 
-### Production build
-On Windows:
+### Build an installer
+
 ```powershell
 pnpm tauri build
 ```
-This produces an MSI and an NSIS installer in `src-tauri/target/release/bundle/`.
 
-## Shipping to the Microsoft Store
-1. Register a Microsoft Partner Center account ($19 individual, one-time).
-2. Reserve the app name **markdpad** in Partner Center.
-3. Switch the Tauri bundle target to `msix` and sign with the Store-issued certificate.
-4. Submit via Partner Center; review usually completes in 1–3 days.
+Produces an NSIS `.exe` installer and an `.msi` in `src-tauri/target/release/bundle/`.
 
 ## Architecture
-- `src-tauri/` — Rust + Tauri 2. Owns file I/O permissions, file associations, CLI argument handling, and the singleton bridge for "Open with markdpad".
-- `src/` — React 19 + TypeScript + Vite. CodeMirror 6 for the editor, markdown-it (+ KaTeX, task lists, anchor) + Shiki + Mermaid for the renderer.
-- Per-file view/edit mode and UI state are persisted via `tauri-plugin-store` in the OS app data directory.
+
+- `src-tauri/` — Rust + Tauri 2. File I/O, file associations, CLI argument handling, single-instance bridge.
+- `src/` — React 19 + TypeScript + Vite. CodeMirror 6 for the editor; markdown-it + KaTeX + Mermaid + Shiki for the renderer.
+- Per-file state is persisted via `tauri-plugin-store` in the OS app data directory.
 
 ## License
+
 TBD.
