@@ -32,6 +32,9 @@
     "react-dom": "^19.0.0",
     "shiki": "^1.26.1"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
   "devDependencies": {
     "@tauri-apps/cli": "^2.1.0",
     "@types/markdown-it": "^14.1.2",
